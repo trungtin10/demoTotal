@@ -1,6 +1,6 @@
 import express from "express";
 import multer from "multer";
-import fs from "fs";
+import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 import vosk from "vosk";
@@ -8,23 +8,16 @@ import wav from "wav";
 import ffmpeg from "fluent-ffmpeg";
 import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 
-// ---------------------
-// ⚙️ Setup cơ bản
-// ---------------------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
-// ---------------------
-// 💾 Multer: upload file tạm
-// ---------------------
+// Multer tạm
 const upload = multer({ dest: "uploads/" });
 
-// ---------------------
-// 🧠 Model Vosk
-// ---------------------
+// Vosk
 const MODEL_PATH = path.join(__dirname, "model", "vosk-model-small-en-us-0.15");
 const SAMPLE_RATE = 16000;
 
@@ -33,26 +26,20 @@ if (!fs.existsSync(MODEL_PATH)) {
   process.exit(1);
 }
 
-console.log("⏳ Loading Vosk model, please wait...");
 vosk.setLogLevel(0);
-
 let model;
 try {
   model = new vosk.Model(MODEL_PATH);
-  console.log("✅ Vosk model loaded successfully!");
+  console.log("✅ Vosk model loaded!");
 } catch (err) {
   console.error("❌ Failed to load model:", err.message);
   process.exit(1);
 }
 
-// ---------------------
-// 🔧 Setup ffmpeg
-// ---------------------
+// ffmpeg
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
-// ---------------------
-// 🎧 API chính: /transcribe
-// ---------------------
+// Transcribe
 app.post("/transcribe", upload.single("audio"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No audio file uploaded" });
 
@@ -60,7 +47,7 @@ app.post("/transcribe", upload.single("audio"), async (req, res) => {
   const convertedPath = `${inputPath}_converted.wav`;
 
   try {
-    // 🌀 B1: Convert file sang PCM S16LE, mono, 16kHz
+    // Convert sang PCM S16LE mono 16kHz
     await new Promise((resolve, reject) => {
       ffmpeg(inputPath)
         .audioChannels(1)
@@ -72,51 +59,42 @@ app.post("/transcribe", upload.single("audio"), async (req, res) => {
         .save(convertedPath);
     });
 
-    // ✅ Xóa file gốc sau khi convert xong
-    fs.unlinkSync(inputPath);
+    await fs.unlink(inputPath);
 
-    // 🌀 B2: Đọc file convert bằng wav.Reader
+    // Đọc audio bằng wav
     const reader = new wav.Reader();
     const recognizer = new vosk.Recognizer({ model, sampleRate: SAMPLE_RATE });
 
-    reader.on("format", (format) => {
-      console.log("🎧 Audio format after conversion:", format);
-    });
+    reader.on("data", (chunk) => recognizer.acceptWaveform(chunk));
 
-    reader.on("data", (chunk) => {
-      recognizer.acceptWaveform(chunk);
-    });
-
-    reader.on("end", () => {
+    reader.on("end", async () => {
       const result = recognizer.finalResult();
       const text = (result.text || "").trim();
-
       recognizer.free();
-      fs.unlinkSync(convertedPath);
+
+      await fs.unlink(convertedPath);
 
       console.log(`🎙️ Recognized: "${text}"`);
       res.json({ text });
     });
 
-    reader.on("error", (err) => {
+    reader.on("error", async (err) => {
       console.error("❌ Reader error:", err);
-      if (fs.existsSync(convertedPath)) fs.unlinkSync(convertedPath);
       recognizer.free();
+      await fs.unlink(convertedPath).catch(() => {});
       res.status(500).json({ error: "Reader error", details: err.message });
     });
 
     fs.createReadStream(convertedPath).pipe(reader);
   } catch (err) {
     console.error("❌ Transcription error:", err);
-    if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
-    if (fs.existsSync(convertedPath)) fs.unlinkSync(convertedPath);
+    await fs.unlink(inputPath).catch(() => {});
+    await fs.unlink(convertedPath).catch(() => {});
     res.status(500).json({ error: "Transcription failed", details: err.message });
   }
 });
 
-// ---------------------
-// 🧪 Route kiểm tra server
-// ---------------------
+// Health check
 app.get("/", (req, res) => {
   res.json({
     status: "✅ Vosk API is running",
@@ -125,11 +103,12 @@ app.get("/", (req, res) => {
   });
 });
 
-// ---------------------
-// 🚀 Khởi động server
-// ---------------------
-app.listen(port, "0.0.0.0", () => {
-  console.log(`🚀 Server is running at http://localhost:${port}`);
-  console.log(`👉 Test with:`);
-  console.log(`curl -X POST http://localhost:${port}/transcribe -F "audio=@audio/test.wav"`);
+// Node version check
+app.get("/node-version", (req, res) => {
+  res.send({ node: process.version });
+});
+
+// Start server
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
 });
