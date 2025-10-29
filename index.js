@@ -1,6 +1,7 @@
 import express from "express";
 import multer from "multer";
-import fs from "fs/promises";
+import fs from "fs";               // fs bình thường để dùng existsSync, createReadStream
+import fsPromises from "fs/promises"; // fs/promises để dùng unlink async
 import path from "path";
 import { fileURLToPath } from "url";
 import vosk from "vosk";
@@ -21,6 +22,7 @@ const upload = multer({ dest: "uploads/" });
 const MODEL_PATH = path.join(__dirname, "model", "vosk-model-small-en-us-0.15");
 const SAMPLE_RATE = 16000;
 
+// Sử dụng fs bình thường để check file/directory tồn tại
 if (!fs.existsSync(MODEL_PATH)) {
   console.error("❌ Model not found! Please check path:", MODEL_PATH);
   process.exit(1);
@@ -59,7 +61,7 @@ app.post("/transcribe", upload.single("audio"), async (req, res) => {
         .save(convertedPath);
     });
 
-    await fs.unlink(inputPath);
+    await fsPromises.unlink(inputPath);
 
     // Đọc audio bằng wav
     const reader = new wav.Reader();
@@ -72,7 +74,7 @@ app.post("/transcribe", upload.single("audio"), async (req, res) => {
       const text = (result.text || "").trim();
       recognizer.free();
 
-      await fs.unlink(convertedPath);
+      await fsPromises.unlink(convertedPath);
 
       console.log(`🎙️ Recognized: "${text}"`);
       res.json({ text });
@@ -81,15 +83,15 @@ app.post("/transcribe", upload.single("audio"), async (req, res) => {
     reader.on("error", async (err) => {
       console.error("❌ Reader error:", err);
       recognizer.free();
-      await fs.unlink(convertedPath).catch(() => {});
+      await fsPromises.unlink(convertedPath).catch(() => {});
       res.status(500).json({ error: "Reader error", details: err.message });
     });
 
     fs.createReadStream(convertedPath).pipe(reader);
   } catch (err) {
     console.error("❌ Transcription error:", err);
-    await fs.unlink(inputPath).catch(() => {});
-    await fs.unlink(convertedPath).catch(() => {});
+    await fsPromises.unlink(inputPath).catch(() => {});
+    await fsPromises.unlink(convertedPath).catch(() => {});
     res.status(500).json({ error: "Transcription failed", details: err.message });
   }
 });
