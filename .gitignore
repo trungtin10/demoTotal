@@ -1,0 +1,13 @@
+# Node modules
+node_modules/
+
+# Uploads tạm
+uploads/
+
+*.log
+
+# Mac/OSX
+.DS_Store
+
+.env
+
