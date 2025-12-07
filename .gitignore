@@ -1,13 +1,17 @@
 # Node modules
 node_modules/
 
-# Uploads tạm
+# Uploads temporary folder
 uploads/
 
+# Logs
 *.log
 
-# Mac/OSX
+# OS Files
 .DS_Store
 
+# Environment files
 .env
 
+# Ignore model folder (VERY IMPORTANT)
+model/

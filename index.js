@@ -19,7 +19,7 @@ const port = process.env.PORT || 3000;
 const upload = multer({ dest: "uploads/" });
 
 // Vosk
-const MODEL_PATH = path.join(__dirname, "model", "vosk-model-small-en-us-0.15");
+const MODEL_PATH = path.join(__dirname, "model", "vosk-model-en-us-0.22");
 const SAMPLE_RATE = 16000;
 
 // Sử dụng fs bình thường để check file/directory tồn tại
