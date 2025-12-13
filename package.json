@@ -3,21 +3,18 @@
   "version": "1.0.0",
   "type": "module",
   "main": "index.js",
-"scripts": {
-  "start": "bash render-start.sh"
-
-
+  "scripts": {
+    "start": "bash render-start.sh"
   },
   "engines": {
     "node": "18.x"
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@alphacep/vosk": "^0.3.46",
     "express": "^4.18.2",
     "fluent-ffmpeg": "^2.1.3",
-    "multer": "^2.0.0",               
-    "vosk": "0.3.31",
+    "multer": "^2.0.0",
     "wav": "^1.0.2"
   }
-  
 }
